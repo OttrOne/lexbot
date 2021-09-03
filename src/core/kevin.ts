@@ -10,7 +10,7 @@ import { APIInteractionGuildMember } from 'discord-api-types';
  *  Command handler to autoload commands
  *
  * @author AlexOttr <alex@ottr.one>
- * @version 1.0
+ * @version 1.2
  *
  * @exports Kevin
  */
@@ -53,6 +53,7 @@ export class Kevin {
         try {
             console.log(`${this._load('../commands/')} commands loaded.`)
         } catch(error) {
+            console.log(error)
             console.log(`No commands loaded.`)
             return;
         }
