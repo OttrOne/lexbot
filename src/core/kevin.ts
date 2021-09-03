@@ -1,11 +1,8 @@
 import { readdirSync, lstatSync } from 'fs';
 import { join } from 'path';
-import { Client, GuildMember, MessageEmbed, Permissions, TextBasedChannels } from 'discord.js';
+import { ApplicationCommandData, Client, GuildMember, MessageEmbed, Permissions, TextBasedChannels } from 'discord.js';
 import { Command, CommandType } from '../interfaces/command';
-import { REST } from '@discordjs/rest';
-import { Routes } from 'discord-api-types/rest/v9';
 import { APIInteractionGuildMember } from 'discord-api-types';
-import { SlashCommandBuilder } from '@discordjs/builders';
 
 /**
  *  Command handler to autoload commands
@@ -93,43 +90,33 @@ export class Kevin {
      */
     async _registerSlashCommands() : Promise<void> {
 
-        if (!process.env.TOKEN) return;
-        const debugMode = process.env.DEBUG || false;
+        const debugGuild = process.env.GUILD || '';
 
-        if (this.client === null || this.client.user === null) return;
-        const slashCommands: Array<Object> = [];
+        if (this.client === null) return;
+        const slashCommands: Array<ApplicationCommandData> = [];
 
         this.commands.forEach((command) => {
             if (typeof command.type === 'undefined' || command.type === CommandType.NORMAL) return;
-            slashCommands.push(new SlashCommandBuilder().setName(command.name).setDescription(command.description).toJSON());
+            slashCommands.push({ name: command.name, description: command.description, options: command.options } as ApplicationCommandData);
         });
 
         // skip the rest if there are no commands to add.
         if (slashCommands.length === 0) return;
 
-        const rest = new REST({ version: '9' }).setToken(process.env.TOKEN);
-        // provision per guild
-        if (debugMode) {
-            this.client.guilds.cache.forEach(async (guild) => {
-                try {
-                    await rest.put(
-                        Routes.applicationGuildCommands(this.client.user!.id, guild.id),
-                        { body: slashCommands },
-                    );
-                    console.log(`Successfully reloaded LexBot (/) commands for guild ${guild.name}.`);
-                }
-                catch (error) {
-                    console.error(error);
-                }
-            });
-            return;
-        }
         try {
-            await rest.put(
-                Routes.applicationCommands(this.client.user!.id),
-                { body: slashCommands },
-            );
-            console.log('Successfully reloaded LexBot (/) commands globally.');
+            let commands = undefined;
+            // provision per guild
+            const guild = this.client.guilds.cache.get(debugGuild);
+            if (guild) {
+                commands = guild.commands;
+            }
+            else {
+                commands = this.client.application?.commands;
+            }
+            for (const command of slashCommands) {
+                commands?.create(command);
+            }
+            console.log('Successfully reloaded LexBot (/) commands.');
         }
         catch (error) {
             console.error(error);
