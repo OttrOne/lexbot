@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "@discordjs/builders";
-import { Message } from "discord.js";
+import { CommandInteraction, GuildMember, Message, TextBasedChannels } from "discord.js";
 
 export interface Command {
 
@@ -14,4 +14,5 @@ export interface Command {
     category: string;
     description: string;
     run: (message: Message, args: Array<string>, text: string) => void;
+    slashcommandrun?: (interaction: CommandInteraction, member: GuildMember) => void;
 }

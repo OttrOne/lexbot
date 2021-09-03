@@ -1,7 +1,10 @@
 import { readdirSync, lstatSync } from 'fs';
 import { join } from 'path';
-import { Client, GuildMember, Message, MessageEmbed, Permissions } from 'discord.js';
+import { Client, GuildMember, Message, MessageEmbed, Permissions, TextBasedChannels } from 'discord.js';
 import { Command } from '../interfaces/command'
+import { REST } from '@discordjs/rest';
+import { Routes } from 'discord-api-types/rest/v9';
+import { APIInteractionGuildMember } from 'discord-api-types';
 
 /**
  *  Command handler to autoload commands
@@ -26,6 +29,15 @@ export class Kevin {
     };
 
     /**
+     * Typeguard to check if member is a GuildMember
+     * @param {GuildMember | APIInteractionGuildMember} member to check
+     * @returns true if is a GuildMember
+     */
+    isGuildMember(member: GuildMember | APIInteractionGuildMember): member is GuildMember {
+        return 'bannable' in member;
+    }
+
+    /**
      * Create a new Kevin command handler instance
      * @param {Client} client Bot client instance
      * @param {string} prefix Command prefix, defaults to '!'
@@ -44,6 +56,7 @@ export class Kevin {
             console.log(`No commands loaded.`)
             return;
         }
+        this._registerSlashCommands()
         this._listen()
     }
 
@@ -72,6 +85,34 @@ export class Kevin {
     }
 
     /**
+     * Provisions all commands to the guilds.
+     */
+    async _registerSlashCommands() : Promise<void> {
+
+        if(!process.env.TOKEN) return;
+        if(this.client === null || this.client.user === null) return;
+        const slashCommands: Array<Object> = []
+
+        this.commands.forEach((command) => {
+            if (!command.slashcommand) return;
+            slashCommands.push(command.slashcommand.toJSON())
+        })
+
+        const rest = new REST({ version: '9' }).setToken(process.env.TOKEN);
+        this.client.guilds.cache.forEach( async (guild) => {
+            try {
+                await rest.put(
+                    Routes.applicationGuildCommands(this.client.user!.id, guild.id),
+                    { body: slashCommands },
+                );
+            } catch (error) {
+                console.error(error);
+            }
+        });
+        console.log('Successfully reloaded LexBot (/) commands.');
+    }
+
+    /**
      * Add the loaded command with given options to the command map
      * @param {Command} command to register
      */
@@ -90,10 +131,7 @@ export class Kevin {
      * Prints the help list with all commands of user scope
      * @param {Message} message
      */
-    help(message: Message) : void {
-
-        const { member } = message;
-        if(!member) return;
+    help(channel: TextBasedChannels, member: GuildMember) : void {
 
         const printCommand = (command: Command) : string => {
             const args = command.expectedArgs ? ` ${command.expectedArgs}` : ''
@@ -131,7 +169,7 @@ export class Kevin {
             embed.addField(category, cmdpcat);
         }
 
-        message.channel.send({embeds: [embed] })
+        channel.send({embeds: [embed] })
     }
 
     /**
@@ -180,6 +218,28 @@ export class Kevin {
     }
 
     /**
+     * Check if current Member can use the command and returns with message if not
+     * @param {Command} command command to check
+     * @param {GuildMember} member member to check
+     * @returns tuple with permissionstatus and rolename (or undefined if true)
+     */
+    _canUseCommand(command: Command, member: GuildMember) : [boolean, string | undefined] {
+
+        // check permissions
+        const [hasPermission, permissionName] = this._checkPermissions(command, member);
+        if (!hasPermission) {
+            return [false, `You don't have the permission ${permissionName} to use this command.`];
+        }
+
+        // check roles
+        const [hasRole, roleName] = this._checkRoles(command, member)
+        if(!hasRole) {
+            return [false, `You must have the "${roleName}" role to use this command.`];
+        }
+        return [true, undefined];
+    }
+
+    /**
      * Listener for command inputs
      * @listens messageCreate
      * @listens interactionCreate
@@ -187,7 +247,7 @@ export class Kevin {
     _listen() : void {
         this.client.on('messageCreate', message => {
 
-            const { member, content, guild } = message;
+            const { member, content, guild, channel } = message;
             if(member === null) return;
             if(guild === null) return;
             if(!content.startsWith(this.prefix)) return;
@@ -207,29 +267,20 @@ export class Kevin {
                 }
             })
             if(command.name === this.helpCommand.name) { // command not found
-                this.help(message);
+                this.help(channel, member);
                 return;
             }
 
-            const { permissions, roles, minArgs, maxArgs, expectedArgs } = command;
-
-            // check permissions
-            const [hasPermission, permissionName] = this._checkPermissions(command, member);
-            if (!hasPermission) {
-                message.reply(`You don't have the permission ${permissionName} to use this command.`);
-                return;
-            }
-
-            // check roles
-            const [hasRole, roleName] = this._checkRoles(command, member)
-            if(!hasRole) {
-                message.reply(`You must have the "${roleName}" role to use this command.`);
+            const [canUseCommand, errorMessage] = this._canUseCommand(command, member);
+            if (!canUseCommand) {
+                channel.send(`${errorMessage}`);
                 return;
             }
 
             // check number of arguments
+            const { minArgs, maxArgs, expectedArgs } = command;
             if ((minArgs !== undefined && args.length < minArgs) || (maxArgs  !== undefined && args.length > maxArgs)) {
-                message.reply(`Incorrect usage! Use \`${this.prefix}${`${cmd} ${expectedArgs || ''}`.trimEnd()}\``)
+                channel.send(`Incorrect usage! Use \`${this.prefix}${`${command.name} ${expectedArgs || ''}`.trimEnd()}\``);
                 return;
             }
 
@@ -240,9 +291,28 @@ export class Kevin {
         this.client.on('interactionCreate', async interaction => {
             if (!interaction.isCommand()) return;
 
-            if (interaction.commandName === 'version') {
-                await interaction.reply({ content: 'Pong!', ephemeral: true });
+            // check if Member exists and is guild member
+            const { member } = interaction;
+            if (!member) return;
+            if(!this.isGuildMember(member)) return;
+
+            const command = this.commands.get(interaction.commandName);
+            if(!command) { // command not found
+                interaction.reply(`Slashcommand \`${interaction.commandName}\` not found.`)
+                return;
             }
+
+            if(!command.slashcommandrun) { // command not found
+                interaction.reply(`Slashcommand \`${interaction.commandName}\` found but not configured.`)
+                return;
+            }
+
+            const [canUseCommand, errorMessage] = this._canUseCommand(command, member);
+            if (!canUseCommand) {
+                interaction.reply(`${errorMessage}`);
+                return;
+            }
+            command.slashcommandrun(interaction, member);
         });
     }
 }
