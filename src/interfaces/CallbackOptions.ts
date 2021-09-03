@@ -1,4 +1,4 @@
-import { CommandInteraction, GuildMember, Message } from "discord.js";
+import { CommandInteraction, GuildMember, Message } from 'discord.js';
 
 export interface CallbackOptions {
 

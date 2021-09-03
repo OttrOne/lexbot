@@ -1,7 +1,7 @@
 import { readdirSync, lstatSync } from 'fs';
 import { join } from 'path';
-import { Client, GuildMember, Message, MessageEmbed, Permissions, TextBasedChannels } from 'discord.js';
-import { Command, CommandType } from '../interfaces/command'
+import { Client, GuildMember, MessageEmbed, Permissions, TextBasedChannels } from 'discord.js';
+import { Command, CommandType } from '../interfaces/command';
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/rest/v9';
 import { APIInteractionGuildMember } from 'discord-api-types';
@@ -17,7 +17,7 @@ import { SlashCommandBuilder } from '@discordjs/builders';
  */
 export class Kevin {
 
-    private commands: Map<string,Command>;
+    private commands: Map<string, Command>;
     private client: Client;
     private prefix: string;
 
@@ -26,7 +26,7 @@ export class Kevin {
         aliases: ['h'],
         category: 'LexBot',
         description: 'print the command list',
-        run: () => {}
+        run: () => {},
     };
 
     /**
@@ -52,14 +52,15 @@ export class Kevin {
         this._register(this.helpCommand);
 
         try {
-            console.log(`${this._load('../commands/')} commands loaded.`)
-        } catch(error) {
-            console.log(error)
-            console.log(`No commands loaded.`)
+            console.log(`${this._load('../commands/')} commands loaded.`);
+        }
+        catch (error) {
+            console.log(error);
+            console.log('No commands loaded.');
             return;
         }
         this._registerSlashCommands();
-        this._listen()
+        this._listen();
     }
 
     /**
@@ -71,19 +72,20 @@ export class Kevin {
 
         let count = 0;
         // recursively read directory for commands
-        const files = readdirSync(join(__dirname, dir))
-        for(const file of files) {
-            const stat = lstatSync(join(__dirname, dir, file))
+        const files = readdirSync(join(__dirname, dir));
+        for (const file of files) {
+            const stat = lstatSync(join(__dirname, dir, file));
             if (stat.isDirectory()) {
-                count += this._load(join(dir, file))
-            } else {
-                const command = require(join(__dirname, dir, file))
+                count += this._load(join(dir, file));
+            }
+            else {
+                const command = require(join(__dirname, dir, file));
                 // call the command
-                this._register(command)
+                this._register(command);
                 ++count;
             }
         }
-        return count
+        return count;
     }
 
     /**
@@ -91,31 +93,32 @@ export class Kevin {
      */
     async _registerSlashCommands() : Promise<void> {
 
-        if(!process.env.TOKEN) return;
+        if (!process.env.TOKEN) return;
         const debugMode = process.env.DEBUG || false;
 
-        if(this.client === null || this.client.user === null) return;
-        const slashCommands: Array<Object> = []
+        if (this.client === null || this.client.user === null) return;
+        const slashCommands: Array<Object> = [];
 
         this.commands.forEach((command) => {
             if (typeof command.type === 'undefined' || command.type === CommandType.NORMAL) return;
-            slashCommands.push(new SlashCommandBuilder().setName(command.name).setDescription(command.description).toJSON())
-        })
+            slashCommands.push(new SlashCommandBuilder().setName(command.name).setDescription(command.description).toJSON());
+        });
 
         // skip the rest if there are no commands to add.
         if (slashCommands.length === 0) return;
 
         const rest = new REST({ version: '9' }).setToken(process.env.TOKEN);
-
-        if(debugMode) { // provision per guild
-            this.client.guilds.cache.forEach( async (guild) => {
+        // provision per guild
+        if (debugMode) {
+            this.client.guilds.cache.forEach(async (guild) => {
                 try {
                     await rest.put(
                         Routes.applicationGuildCommands(this.client.user!.id, guild.id),
                         { body: slashCommands },
                     );
                     console.log(`Successfully reloaded LexBot (/) commands for guild ${guild.name}.`);
-                } catch (error) {
+                }
+                catch (error) {
                     console.error(error);
                 }
             });
@@ -126,8 +129,9 @@ export class Kevin {
                 Routes.applicationCommands(this.client.user!.id),
                 { body: slashCommands },
             );
-            console.log(`Successfully reloaded LexBot (/) commands globally.`);
-        } catch (error) {
+            console.log('Successfully reloaded LexBot (/) commands globally.');
+        }
+        catch (error) {
             console.error(error);
         }
     }
@@ -138,13 +142,12 @@ export class Kevin {
      */
     _register(command: Command) : void {
 
-        if(command.permissions) {
-            for(const permission of command.permissions) {
-                if(!Permissions.FLAGS.hasOwnProperty(permission))
-                    return;
+        if (command.permissions) {
+            for (const permission of command.permissions) {
+                if (!Permissions.FLAGS.hasOwnProperty(permission)) return;
             }
         }
-        this.commands.set(command.name, command)
+        this.commands.set(command.name, command);
     }
 
     /**
@@ -156,11 +159,11 @@ export class Kevin {
         const printCommand = (command: Command) : string => {
             if (command.type === CommandType.SLASH) return '';
 
-            const args = command.expectedArgs ? ` ${command.expectedArgs}` : ''
-            const description = command.description ? `, ${command.description}` : ''
-            const aliases = command.aliases ? `, aliases: \`${this.prefix}${command.aliases.join(`\`, \`${this.prefix}`)}\`` : ''
-            return `\`${this.prefix}${command.name}${args}\`${aliases}${description}\n`
-        }
+            const args = command.expectedArgs ? ` ${command.expectedArgs}` : '';
+            const description = command.description ? `, ${command.description}` : '';
+            const aliases = command.aliases ? `, aliases: \`${this.prefix}${command.aliases.join(`\`, \`${this.prefix}`)}\`` : '';
+            return `\`${this.prefix}${command.name}${args}\`${aliases}${description}\n`;
+        };
 
         const commandCategories = new Map<string, Array<Command>>();
         for (const [name, command] of this.commands.entries()) {
@@ -170,7 +173,7 @@ export class Kevin {
             if (!hasPermission) continue;
 
             // check if user has required roles or is administrator
-            const [hasRole, roleName] = this._checkRoles(command, member)
+            const [hasRole, roleName] = this._checkRoles(command, member);
             if (!hasRole) continue;
 
             // add
@@ -181,17 +184,17 @@ export class Kevin {
         }
 
         const embed = new MessageEmbed()
-        .setColor('#00AAFF')
-        .setTitle('Supported Commands')
+            .setColor('#00AAFF')
+            .setTitle('Supported Commands');
 
         for (const [category, commandList] of commandCategories.entries()) {
 
             let cmdpcat = '';
-            for(const command of commandList) cmdpcat += printCommand(command);
+            for (const command of commandList) cmdpcat += printCommand(command);
             embed.addField(category, cmdpcat);
         }
 
-        channel.send({embeds: [embed] })
+        channel.send({ embeds: [embed] });
     }
 
     /**
@@ -206,9 +209,9 @@ export class Kevin {
 
         if (!command.permissions) return [true, undefined];
 
-        const userPermissions = member.permissions.toArray().map(p => `${p}`)
-        for(const permission of command.permissions) {
-            if(!userPermissions.includes(permission)) return [false, permission];
+        const userPermissions = member.permissions.toArray().map(p => `${p}`);
+        for (const permission of command.permissions) {
+            if (!userPermissions.includes(permission)) return [false, permission];
         }
 
         return [true, undefined];
@@ -226,11 +229,11 @@ export class Kevin {
 
         if (!command.roles) return [true, undefined];
 
-        for(const roleName of command.roles) {
-            const role = member.guild.roles.cache.find(role => role.name === roleName)
+        for (const roleName of command.roles) {
+            const cmdRole = member.guild.roles.cache.find(role => role.name === roleName);
 
             if (
-                (!role || !member.roles.cache.has(role.id))
+                (!cmdRole || !member.roles.cache.has(cmdRole.id))
                 && !member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)
             ) {
                 return [false, roleName];
@@ -254,8 +257,8 @@ export class Kevin {
         }
 
         // check roles
-        const [hasRole, roleName] = this._checkRoles(command, member)
-        if(!hasRole) {
+        const [hasRole, roleName] = this._checkRoles(command, member);
+        if (!hasRole) {
             return [false, `You must have the "${roleName}" role to use this command.`];
         }
         return [true, undefined];
@@ -270,12 +273,12 @@ export class Kevin {
         this.client.on('messageCreate', message => {
 
             const { member, content, guild, channel } = message;
-            if(member === null) return;
-            if(guild === null) return;
-            if(!content.startsWith(this.prefix)) return;
+            if (member === null) return;
+            if (guild === null) return;
+            if (!content.startsWith(this.prefix)) return;
             // split command on spaces
-            const args = content.split(/[ ]+/)
-            if(args === undefined) return;
+            const args = content.split(/[ ]+/);
+            if (args === undefined) return;
 
             // get the command name
             const cmd = args.shift()!.toLowerCase().replace(this.prefix, '');
@@ -283,18 +286,19 @@ export class Kevin {
             let command = this.helpCommand;
             this.commands.forEach((eeeee) => {
 
-                if(eeeee.name === cmd || eeeee.aliases?.includes(cmd)) {
+                if (eeeee.name === cmd || eeeee.aliases?.includes(cmd)) {
                     command = eeeee;
                     return;
                 }
-            })
-            if(command.name === this.helpCommand.name) { // command not found
+            });
+            // command not found
+            if (command.name === this.helpCommand.name) {
                 this.help(channel, member);
                 return;
             }
 
             // stop listening if slash command
-            if(command.type === CommandType.SLASH) return;
+            if (command.type === CommandType.SLASH) return;
 
             const [canUseCommand, errorMessage] = this._canUseCommand(command, member);
             if (!canUseCommand) {
@@ -304,14 +308,14 @@ export class Kevin {
 
             // check number of arguments
             const { minArgs, maxArgs, expectedArgs } = command;
-            if ((minArgs !== undefined && args.length < minArgs) || (maxArgs  !== undefined && args.length > maxArgs)) {
+            if ((minArgs !== undefined && args.length < minArgs) || (maxArgs !== undefined && args.length > maxArgs)) {
                 channel.send(`Incorrect usage! Use \`${this.prefix}${`${command.name} ${expectedArgs || ''}`.trimEnd()}\``);
                 return;
             }
 
             // handle command
-            command.run({member, message, args})
-        })
+            command.run({ member, message, args });
+        });
 
         this.client.on('interactionCreate', async interaction => {
             if (!interaction.isCommand()) return;
@@ -319,16 +323,17 @@ export class Kevin {
             // check if Member exists and is guild member
             const { member } = interaction;
             if (!member) return;
-            if(!this.isGuildMember(member)) return;
+            if (!this.isGuildMember(member)) return;
 
             const command = this.commands.get(interaction.commandName);
-            if(!command) { // command not found
-                interaction.reply(`Slashcommand \`${interaction.commandName}\` not found.`)
+            // command not found
+            if (!command) {
+                interaction.reply(`Slashcommand \`${interaction.commandName}\` not found.`);
                 return;
             }
 
-            if(typeof command.type === 'undefined' || command.type === CommandType.NORMAL) { // command not found
-                interaction.reply(`Slashcommand \`${interaction.commandName}\` found but not configured.`)
+            if (typeof command.type === 'undefined' || command.type === CommandType.NORMAL) {
+                interaction.reply(`Slashcommand \`${interaction.commandName}\` found but not configured.`);
                 return;
             }
 
@@ -337,7 +342,7 @@ export class Kevin {
                 interaction.reply(`${errorMessage}`);
                 return;
             }
-            command.run({interaction, member});
+            command.run({ interaction, member });
         });
     }
 }

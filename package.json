@@ -1,12 +1,13 @@
 {
   "name": "lexbot",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "LexBot done in TypeScript",
   "scripts": {
     "prebuild": "node -p \"'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
     "build": "tsc",
-    "run": "node dist/index.js",
-    "test": "nodemon src/index.ts"
+    "lint": "eslint \"**/*.ts\"",
+    "start": "node dist/index.js",
+    "debug": "nodemon src/index.ts"
   },
   "repository": {
     "type": "git",
@@ -31,7 +32,12 @@
     "dotenv": "^10.0.0"
   },
   "devDependencies": {
+    "@types/node": "^16.7.10",
+    "@typescript-eslint/eslint-plugin": "^4.30.0",
+    "@typescript-eslint/parser": "^4.30.0",
     "eslint": "^7.32.0",
+    "eslint-config-airbnb-base": "^14.2.1",
+    "eslint-plugin-import": "^2.24.2",
     "nodemon": "^2.0.12"
   }
 }

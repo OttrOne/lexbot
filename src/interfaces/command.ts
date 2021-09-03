@@ -1,5 +1,12 @@
-import { CommandInteraction, GuildMember, Message } from "discord.js";
-import { CallbackOptions } from './CallbackOptions'
+import { CommandInteraction, GuildMember } from 'discord.js';
+import { CallbackOptions } from './CallbackOptions';
+
+// eslint-disable-next-line no-shadow
+export enum CommandType {
+    NORMAL,
+    SLASH,
+    BOTH
+}
 
 export interface Command {
 
@@ -15,10 +22,4 @@ export interface Command {
     description: string;
     run: (args: CallbackOptions) => void;
     slashcommandrun?: (interaction: CommandInteraction, member: GuildMember) => void;
-}
-
-export enum CommandType {
-    NORMAL,
-    SLASH,
-    BOTH
 }
