@@ -1,6 +1,6 @@
 import { readdirSync, lstatSync } from 'fs';
 import { join } from 'path';
-import { Client, Permissions } from 'discord.js';
+import { Client, GuildMember, Message, MessageEmbed, Permissions } from 'discord.js';
 import { Command } from '../interfaces/command'
 
 /**
@@ -17,6 +17,14 @@ export class Kevin {
     private client: Client;
     private prefix: string;
 
+    private helpCommand: Command = {
+        name: 'help',
+        aliases: ['h'],
+        category: 'LexBot',
+        description: 'print the command list',
+        run: () => {}
+    };
+
     /**
      * Create a new Kevin command handler instance
      * @param {Client} client Bot client instance
@@ -27,6 +35,8 @@ export class Kevin {
         this.commands = new Map<string, Command>();
         this.client = client;
         this.prefix = prefix;
+
+        this._register(this.helpCommand);
 
         try {
             console.log(`${this._load('../commands/')} commands loaded.`)
@@ -65,7 +75,7 @@ export class Kevin {
      * Add the loaded command with given options to the command map
      * @param {Command} command to register
      */
-    _register(command: Command) {
+    _register(command: Command) : void {
 
         if(command.permissions) {
             for(const permission of command.permissions) {
@@ -76,7 +86,105 @@ export class Kevin {
         this.commands.set(command.name, command)
     }
 
-    _listen() {
+    /**
+     * Prints the help list with all commands of user scope
+     * @param {Message} message
+     */
+    help(message: Message) : void {
+
+        const { member } = message;
+        if(!member) return;
+
+        const printCommand = (command: Command) : string => {
+            const args = command.expectedArgs ? ` ${command.expectedArgs}` : ''
+            const description = command.description ? `, ${command.description}` : ''
+            const aliases = command.aliases ? `, aliases: \`${this.prefix}${command.aliases.join(`\`, \`${this.prefix}`)}\`` : ''
+            return `\`${this.prefix}${command.name}${args}\`${aliases}${description}\n`
+        }
+
+        const commandCategories = new Map<string, Array<Command>>();
+        for (const [name, command] of this.commands.entries()) {
+
+            const [hasPermission, permissionName] = this._checkPermissions(command, member);
+            // check for permissions
+            if (!hasPermission) continue;
+
+            // check if user has required roles or is administrator
+            const [hasRole, roleName] = this._checkRoles(command, member)
+            if (!hasRole) continue;
+
+            // add
+            const categorylist = commandCategories.get(command.category) || [];
+            categorylist.push(command);
+
+            commandCategories.set(command.category, categorylist);
+        }
+
+        const embed = new MessageEmbed()
+        .setColor('#00AAFF')
+        .setTitle('Supported Commands')
+
+        for (const [category, commandList] of commandCategories.entries()) {
+
+            let cmdpcat = '';
+            for(const command of commandList) cmdpcat += printCommand(command);
+            embed.addField(category, cmdpcat);
+        }
+
+        message.channel.send({embeds: [embed] })
+    }
+
+    /**
+     * Check the permissions of a given command for a given member.
+     * Returns true and undefined if no permissions specified or user has all permissions
+     * (or is administrator), else false and permissionname
+     * @param {Command} command command instance to check
+     * @param {GuildMember} member member to check
+     * @returns tuple with permissionstatus and rolename (or undefined if true)
+     */
+    _checkPermissions(command: Command, member: GuildMember) : [boolean, string | undefined] {
+
+        if (!command.permissions) return [true, undefined];
+
+        const userPermissions = member.permissions.toArray().map(p => `${p}`)
+        for(const permission of command.permissions) {
+            if(!userPermissions.includes(permission)) return [false, permission];
+        }
+
+        return [true, undefined];
+    }
+
+    /**
+     * Check the roles of a given command for a given member.
+     * Returns true and undefined if no role specified or user has all roles
+     * (or is administrator), else false and rolename
+     * @param {Command} command command instance to check
+     * @param {GuildMember} member member to check
+     * @returns tuple with permissionstatus and rolename (or undefined if true)
+     */
+    _checkRoles(command: Command, member: GuildMember) : [boolean, string | undefined] {
+
+        if (!command.roles) return [true, undefined];
+
+        for(const roleName of command.roles) {
+            const role = member.guild.roles.cache.find(role => role.name === roleName)
+
+            if (
+                (!role || !member.roles.cache.has(role.id))
+                && !member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)
+            ) {
+                return [false, roleName];
+            }
+        }
+        return [true, undefined];
+    }
+
+    /**
+     * Listener for command inputs
+     * @listens messageCreate
+     * @listens interactionCreate
+     */
+    _listen() : void {
         this.client.on('messageCreate', message => {
 
             const { member, content, guild } = message;
@@ -90,14 +198,7 @@ export class Kevin {
             // get the command name
             const cmd = args.shift()!.toLowerCase().replace(this.prefix, '');
 
-            let command: Command = {
-                name: '',
-                category: '',
-                description: '',
-                expectedArgs: '',
-                run: () => {}
-            };
-
+            let command = this.helpCommand;
             this.commands.forEach((eeeee) => {
 
                 if(eeeee.name === cmd || eeeee.aliases?.includes(cmd)) {
@@ -105,35 +206,25 @@ export class Kevin {
                     return;
                 }
             })
-            if(command.name === '') return; // command not found
+            if(command.name === this.helpCommand.name) { // command not found
+                this.help(message);
+                return;
+            }
 
             const { permissions, roles, minArgs, maxArgs, expectedArgs } = command;
 
             // check permissions
-            if(permissions) {
-
-                // convert PermissionStrings to Strings
-                const userPermissions = member.permissions.toArray().map(p => `${p}`)
-
-                for(const permission of permissions) {
-                    if(!userPermissions.includes(permission)) {
-                        message.reply(`You must have the "${permission}" permission to use this command.`);
-                        return;
-                    }
-
-                }
-
+            const [hasPermission, permissionName] = this._checkPermissions(command, member);
+            if (!hasPermission) {
+                message.reply(`You don't have the permission ${permissionName} to use this command.`);
+                return;
             }
-            // check roles
-            if(roles) {
 
-                for(const roleName of roles) {
-                    const role = guild.roles.cache.find(role => role.name === roleName)
-                    if( (!role || !member.roles.cache.has(role.id)) && !member.permissions.has(Permissions.FLAGS.ADMINISTRATOR)) {
-                        message.reply(`You must have the "${roleName}" role to use this command.`);
-                        return;
-                    }
-                }
+            // check roles
+            const [hasRole, roleName] = this._checkRoles(command, member)
+            if(!hasRole) {
+                message.reply(`You must have the "${roleName}" role to use this command.`);
+                return;
             }
 
             // check number of arguments

@@ -16,7 +16,8 @@
     "strict": true,                                      /* Enable all strict type-checking options. */
     "noImplicitAny": true,                            /* Enable error reporting for expressions and declarations with an implied `any` type.. */
     "strictNullChecks": true,                         /* When type checking, take into account `null` and `undefined`. */
-    "skipLibCheck": true                                 /* Skip type checking all .d.ts files. */
+    "skipLibCheck": true,                                 /* Skip type checking all .d.ts files. */
+    "lib": [ "es6", "dom" ]
   },
   "include": ["src/**/*", "test/**/*"]
 }

@@ -1,6 +1,6 @@
 {
   "name": "lexbot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "LexBot done in TypeScript",
   "scripts": {
     "prebuild": "node -p \"'export const VERSION = ' + JSON.stringify(require('./package.json').version) + ';'\" > src/version.ts",
