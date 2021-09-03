@@ -1,16 +1,17 @@
 import { readdirSync, lstatSync } from 'fs';
 import { join } from 'path';
 import { Client, GuildMember, Message, MessageEmbed, Permissions, TextBasedChannels } from 'discord.js';
-import { Command } from '../interfaces/command'
+import { Command, CommandType } from '../interfaces/command'
 import { REST } from '@discordjs/rest';
 import { Routes } from 'discord-api-types/rest/v9';
 import { APIInteractionGuildMember } from 'discord-api-types';
+import { SlashCommandBuilder } from '@discordjs/builders';
 
 /**
  *  Command handler to autoload commands
  *
  * @author AlexOttr <alex@ottr.one>
- * @version 1.2
+ * @version 1.3
  *
  * @exports Kevin
  */
@@ -57,7 +58,7 @@ export class Kevin {
             console.log(`No commands loaded.`)
             return;
         }
-        this._registerSlashCommands()
+        this._registerSlashCommands();
         this._listen()
     }
 
@@ -91,26 +92,44 @@ export class Kevin {
     async _registerSlashCommands() : Promise<void> {
 
         if(!process.env.TOKEN) return;
+        const debugMode = process.env.DEBUG || false;
+
         if(this.client === null || this.client.user === null) return;
         const slashCommands: Array<Object> = []
 
         this.commands.forEach((command) => {
-            if (!command.slashcommand) return;
-            slashCommands.push(command.slashcommand.toJSON())
+            if (typeof command.type === 'undefined' || command.type === CommandType.NORMAL) return;
+            slashCommands.push(new SlashCommandBuilder().setName(command.name).setDescription(command.description).toJSON())
         })
 
+        // skip the rest if there are no commands to add.
+        if (slashCommands.length === 0) return;
+
         const rest = new REST({ version: '9' }).setToken(process.env.TOKEN);
-        this.client.guilds.cache.forEach( async (guild) => {
-            try {
-                await rest.put(
-                    Routes.applicationGuildCommands(this.client.user!.id, guild.id),
-                    { body: slashCommands },
-                );
-            } catch (error) {
-                console.error(error);
-            }
-        });
-        console.log('Successfully reloaded LexBot (/) commands.');
+
+        if(debugMode) { // provision per guild
+            this.client.guilds.cache.forEach( async (guild) => {
+                try {
+                    await rest.put(
+                        Routes.applicationGuildCommands(this.client.user!.id, guild.id),
+                        { body: slashCommands },
+                    );
+                    console.log(`Successfully reloaded LexBot (/) commands for guild ${guild.name}.`);
+                } catch (error) {
+                    console.error(error);
+                }
+            });
+            return;
+        }
+        try {
+            await rest.put(
+                Routes.applicationCommands(this.client.user!.id),
+                { body: slashCommands },
+            );
+            console.log(`Successfully reloaded LexBot (/) commands globally.`);
+        } catch (error) {
+            console.error(error);
+        }
     }
 
     /**
@@ -135,6 +154,8 @@ export class Kevin {
     help(channel: TextBasedChannels, member: GuildMember) : void {
 
         const printCommand = (command: Command) : string => {
+            if (command.type === CommandType.SLASH) return '';
+
             const args = command.expectedArgs ? ` ${command.expectedArgs}` : ''
             const description = command.description ? `, ${command.description}` : ''
             const aliases = command.aliases ? `, aliases: \`${this.prefix}${command.aliases.join(`\`, \`${this.prefix}`)}\`` : ''
@@ -272,6 +293,9 @@ export class Kevin {
                 return;
             }
 
+            // stop listening if slash command
+            if(command.type === CommandType.SLASH) return;
+
             const [canUseCommand, errorMessage] = this._canUseCommand(command, member);
             if (!canUseCommand) {
                 channel.send(`${errorMessage}`);
@@ -286,7 +310,7 @@ export class Kevin {
             }
 
             // handle command
-            command.run(message, args, args.join(' '))
+            command.run({member, message, args})
         })
 
         this.client.on('interactionCreate', async interaction => {
@@ -303,7 +327,7 @@ export class Kevin {
                 return;
             }
 
-            if(!command.slashcommandrun) { // command not found
+            if(typeof command.type === 'undefined' || command.type === CommandType.NORMAL) { // command not found
                 interaction.reply(`Slashcommand \`${interaction.commandName}\` found but not configured.`)
                 return;
             }
@@ -313,7 +337,7 @@ export class Kevin {
                 interaction.reply(`${errorMessage}`);
                 return;
             }
-            command.slashcommandrun(interaction, member);
+            command.run({interaction, member});
         });
     }
 }

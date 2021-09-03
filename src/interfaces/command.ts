@@ -1,10 +1,10 @@
-import { SlashCommandBuilder } from "@discordjs/builders";
 import { CommandInteraction, GuildMember, Message } from "discord.js";
+import { CallbackOptions } from './CallbackOptions'
 
 export interface Command {
 
     name: string;
-    slashcommand?: SlashCommandBuilder;
+    type?: CommandType;
     aliases?: Array<string>;
     minArgs?: number;
     maxArgs?: number;
@@ -13,6 +13,12 @@ export interface Command {
     roles?: Array<string>;
     category: string;
     description: string;
-    run: (message: Message, args: Array<string>, text: string) => void;
+    run: (args: CallbackOptions) => void;
     slashcommandrun?: (interaction: CommandInteraction, member: GuildMember) => void;
+}
+
+export enum CommandType {
+    NORMAL,
+    SLASH,
+    BOTH
 }
