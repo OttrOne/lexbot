@@ -3,12 +3,13 @@ import { join } from 'path';
 import { ApplicationCommandData, Client, GuildMember, MessageEmbed, Permissions, TextBasedChannels } from 'discord.js';
 import { Command, CommandType } from '../interfaces/command';
 import { APIInteractionGuildMember } from 'discord-api-types';
+import logger from '../core/logger';
 
 /**
  *  Command handler to autoload commands
  *
  * @author AlexOttr <alex@ottr.one>
- * @version 1.3
+ * @version 1.4
  *
  * @exports Kevin
  */
@@ -49,11 +50,11 @@ export class Kevin {
         this._register(this.helpCommand);
 
         try {
-            console.log(`${this._load('../commands/')} commands loaded.`);
+            logger.info(`[Kevin] ${this._load('../commands/')} commands loaded.`);
         }
         catch (error) {
-            console.log(error);
-            console.log('No commands loaded.');
+            logger.info('[Kevin] No commands loaded.');
+            logger.error(error);
             return;
         }
         this._registerSlashCommands();
@@ -76,6 +77,7 @@ export class Kevin {
                 count += this._load(join(dir, file));
             }
             else {
+                if (file.startsWith('.')) continue;
                 const command = require(join(__dirname, dir, file));
                 // call the command
                 this._register(command);
@@ -116,7 +118,7 @@ export class Kevin {
             for (const command of slashCommands) {
                 commands?.create(command);
             }
-            console.log('Successfully reloaded LexBot (/) commands.');
+            logger.info('[Kevin] Successfully reloaded LexBot (/) commands.');
         }
         catch (error) {
             console.error(error);
