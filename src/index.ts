@@ -21,5 +21,4 @@ client.on('ready', () => {
     new ModLoader(client);
 });
 
-
 client.login(process.env.TOKEN);

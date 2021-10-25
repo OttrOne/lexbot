@@ -2,14 +2,13 @@ import { readdirSync, lstatSync } from 'fs';
 import { join } from 'path';
 import { ApplicationCommandData, Client, GuildMember, MessageEmbed, Permissions, TextBasedChannels } from 'discord.js';
 import { Command, CommandType } from '../interfaces/command';
-import { APIInteractionGuildMember } from 'discord-api-types';
 import logger from '../core/logger';
 
 /**
  *  Command handler to autoload commands
  *
  * @author AlexOttr <alex@ottr.one>
- * @version 1.4
+ * @version 1.5
  *
  * @exports Kevin
  */
@@ -27,14 +26,12 @@ export class Kevin {
         run: () => {},
     };
 
-    /**
-     * Typeguard to check if member is a GuildMember
-     * @param {GuildMember | APIInteractionGuildMember} member to check
-     * @returns true if is a GuildMember
-     */
-    isGuildMember(member: GuildMember | APIInteractionGuildMember): member is GuildMember {
-        return 'bannable' in member;
-    }
+    private dummyCommand: Command = {
+        name: '',
+        category: '',
+        description: '',
+        run: () => {},
+    };
 
     /**
      * Create a new Kevin command handler instance
@@ -272,7 +269,7 @@ export class Kevin {
             // get the command name
             const cmd = args.shift()!.toLowerCase().replace(this.prefix, '');
 
-            let command = this.helpCommand;
+            let command = this.dummyCommand;
             this.commands.forEach((eeeee) => {
 
                 if (eeeee.name === cmd || eeeee.aliases?.includes(cmd)) {
@@ -280,6 +277,7 @@ export class Kevin {
                     return;
                 }
             });
+            if (command === this.dummyCommand) return;
             // command not found
             if (command.name === this.helpCommand.name) {
                 this.help(channel, member);
@@ -312,7 +310,7 @@ export class Kevin {
             // check if Member exists and is guild member
             const { member } = interaction;
             if (!member) return;
-            if (!this.isGuildMember(member)) return;
+            if (!(member instanceof GuildMember)) return;
 
             const command = this.commands.get(interaction.commandName);
             // command not found
