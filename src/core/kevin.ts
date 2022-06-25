@@ -1,6 +1,6 @@
 import { readdirSync, lstatSync } from 'fs';
 import { join } from 'path';
-import { ApplicationCommandData, Client, GuildMember, MessageEmbed, Permissions, TextBasedChannels } from 'discord.js';
+import { ApplicationCommandData, Client, GuildMember, MessageEmbed, Permissions, TextBasedChannel } from 'discord.js';
 import { Command, CommandType } from '../interfaces/command';
 import logger from '../core/logger';
 
@@ -140,7 +140,7 @@ export class Kevin {
      * Prints the help list with all commands of user scope
      * @param {Message} message
      */
-    help(channel: TextBasedChannels, member: GuildMember) : void {
+    help(channel: TextBasedChannel, member: GuildMember) : void {
 
         const printCommand = (command: Command) : string => {
             if (command.type === CommandType.SLASH) return '';
